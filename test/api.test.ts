@@ -1,11 +1,19 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createApi, ApiError } from '../api.js';
+import { createApi, ApiError, type FetchImpl } from '../src/api.ts';
+import type { User } from '../src/types.ts';
 
 const BASE = 'https://api.test/api';
-const USER = { id: 1, username: 'freddie', profile: { first_name: 'Freddie', specialization: 'vocals' } };
+const USER: User = { id: 1, username: 'freddie', profile: { first_name: 'Freddie', specialization: 'vocals' } };
 
-function json(status, body) {
+interface Call extends RequestInit {
+  path: string;
+  auth: string | undefined;
+}
+
+type Handler = (call: Call, n: number) => Response | undefined | Promise<Response | undefined>;
+
+function json(status: number, body?: unknown): Response {
   return new Response(body === undefined ? '' : JSON.stringify(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
@@ -13,12 +21,15 @@ function json(status, body) {
 }
 
 // Мок fetch: по очереди вызывает обработчики для каждого запроса и сохраняет историю.
-function mockFetch(handler) {
-  const calls = [];
-  const fetchImpl = async (url, init) => {
-    const call = { path: url.replace(BASE, ''), ...init, auth: init.headers.Authorization };
+function mockFetch(handler: Handler): { calls: Call[]; fetchImpl: FetchImpl } {
+  const calls: Call[] = [];
+  const fetchImpl: FetchImpl = async (url, init) => {
+    const headers = init.headers as Record<string, string>;
+    const call: Call = { path: url.replace(BASE, ''), ...init, auth: headers.Authorization };
     calls.push(call);
-    return handler(call, calls.length);
+    const res = await handler(call, calls.length);
+    if (!res) throw new Error(`Неожиданный запрос в тесте: ${call.path}`);
+    return res;
   };
   return { calls, fetchImpl };
 }
@@ -31,7 +42,7 @@ test('login сохраняет access и шлёт его как Bearer в /profi
   const api = createApi({ baseUrl: BASE, fetchImpl });
 
   assert.deepEqual(await api.login('freddie', 'secret1'), USER);
-  assert.deepEqual(JSON.parse(calls[0].body), { username: 'freddie', password: 'secret1' });
+  assert.deepEqual(JSON.parse(calls[0].body as string), { username: 'freddie', password: 'secret1' });
   assert.equal(calls[0].auth, undefined, 'на /login/ access не отправляется');
 
   await api.getProfile();
@@ -95,7 +106,7 @@ test('если refresh отклонён, сессия сбрасывается �
   const api = createApi({ baseUrl: BASE, fetchImpl, onSessionExpired: () => (expired += 1) });
   await api.login('freddie', 'secret1');
 
-  await assert.rejects(api.getProfile(), (err) => err instanceof ApiError && err.status === 401);
+  await assert.rejects(api.getProfile(), (err: unknown) => err instanceof ApiError && err.status === 401);
   assert.equal(expired, 1);
   assert.equal(api.isAuthenticated(), false);
 });
@@ -152,7 +163,7 @@ test('ошибки полей DRF при регистрации расклады
     json(400, { username: ['Пользователь с таким именем уже существует.'] }),
   );
   const api = createApi({ baseUrl: BASE, fetchImpl });
-  await assert.rejects(api.register('freddie', 'secret1'), (err) => {
+  await assert.rejects(api.register('freddie', 'secret1'), (err: ApiError) => {
     assert.equal(err.status, 400);
     assert.deepEqual(err.fieldErrors, { username: 'Пользователь с таким именем уже существует.' });
     return true;
@@ -166,7 +177,7 @@ test('сетевая ошибка превращается в ApiError со ст
       throw new TypeError('Failed to fetch');
     },
   });
-  await assert.rejects(api.getSpecializations(), (err) => err instanceof ApiError && err.status === 0);
+  await assert.rejects(api.getSpecializations(), (err: unknown) => err instanceof ApiError && err.status === 0);
 });
 
 test('HTML-ответ прокси (502 nginx) не попадает в текст ошибки', async () => {
@@ -178,7 +189,7 @@ test('HTML-ответ прокси (502 nginx) не попадает в текс
         headers: { 'Content-Type': 'text/html' },
       }),
   });
-  await assert.rejects(api.restoreSession(), (err) => {
+  await assert.rejects(api.restoreSession(), (err: ApiError) => {
     assert.equal(err.status, 502);
     assert.doesNotMatch(err.message, /</);
     assert.match(err.message, /сервер/i);

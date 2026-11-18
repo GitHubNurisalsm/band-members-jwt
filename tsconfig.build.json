@@ -1,0 +1,13 @@
+{
+  // Сборка для браузера: src/*.ts → dist/*.js. Без типов Node, чтобы в браузерный
+  // код случайно не попали process, Buffer и т.п.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": [],
+    "noEmit": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "sourceMap": true
+  },
+  "include": ["src"]
+}

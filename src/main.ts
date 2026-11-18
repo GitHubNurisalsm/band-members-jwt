@@ -1,24 +1,50 @@
-import { createApi } from './api.js';
+import { ApiError, createApi } from './api.ts';
+import type { Specialization, User } from './types.ts';
 import {
   FALLBACK_SPECIALIZATIONS,
   validateLogin,
   validateProfile,
   validateRegistration,
-} from './validation.js';
+} from './validation.ts';
 
-const $ = (selector) => document.querySelector(selector);
+type FieldElement = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+type ViewName = 'loading' | 'auth' | 'profile';
+type TabName = 'login' | 'register';
 
-const views = {
+// Разметка статична, поэтому отсутствие элемента — ошибка в index.html.
+function $<T extends Element = HTMLElement>(selector: string): T {
+  const el = document.querySelector<T>(selector);
+  if (!el) throw new Error(`Элемент ${selector} не найден на странице.`);
+  return el;
+}
+
+function findField(form: HTMLFormElement, name: string): FieldElement | null {
+  const el = form.elements.namedItem(name);
+  return el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement
+    ? el
+    : null;
+}
+
+function field(form: HTMLFormElement, name: string): FieldElement {
+  const el = findField(form, name);
+  if (!el) throw new Error(`Поле ${name} не найдено в форме #${form.id}.`);
+  return el;
+}
+
+const views: Record<ViewName, HTMLElement> = {
   loading: $('#view-loading'),
   auth: $('#view-auth'),
   profile: $('#view-profile'),
 };
-const loginForm = $('#login-form');
-const registerForm = $('#register-form');
-const profileForm = $('#profile-form');
-const tabs = { login: $('#tab-login'), register: $('#tab-register') };
+const loginForm = $<HTMLFormElement>('#login-form');
+const registerForm = $<HTMLFormElement>('#register-form');
+const profileForm = $<HTMLFormElement>('#profile-form');
+const tabs: Record<TabName, HTMLButtonElement> = {
+  login: $<HTMLButtonElement>('#tab-login'),
+  register: $<HTMLButtonElement>('#tab-register'),
+};
 
-let specializations = FALLBACK_SPECIALIZATIONS;
+let specializations: Specialization[] = FALLBACK_SPECIALIZATIONS;
 
 const api = createApi({
   onSessionExpired: () => {
@@ -29,27 +55,27 @@ const api = createApi({
 
 // ---------- Отображение ----------
 
-function showView(name) {
+function showView(name: ViewName): void {
   for (const [key, el] of Object.entries(views)) el.hidden = key !== name;
 }
 
-function showBanner(text, isError = false) {
+function showBanner(text: string, isError = false): void {
   const banner = $('#banner');
   banner.textContent = text;
   banner.classList.toggle('is-error', isError);
   banner.hidden = !text;
 }
 
-function showAuth() {
+function showAuth(): void {
   $('#session').hidden = true;
   showView('auth');
 }
 
-function specializationLabel(value) {
+function specializationLabel(value: string | undefined): string {
   return specializations.find((item) => item.value === value)?.label ?? '—';
 }
 
-function renderUser(user) {
+function renderUser(user: User): void {
   const profile = user.profile ?? {};
   const displayName = profile.first_name || user.username;
 
@@ -67,16 +93,16 @@ function renderUser(user) {
   bio.textContent = profile.bio || 'Пока ничего о себе не рассказал(а).';
   bio.classList.toggle('is-empty', !profile.bio);
 
-  profileForm.elements.firstName.value = profile.first_name ?? '';
-  profileForm.elements.specialization.value = profile.specialization ?? '';
-  profileForm.elements.fee.value = profile.fee ?? '';
-  profileForm.elements.bio.value = profile.bio ?? '';
+  field(profileForm, 'firstName').value = profile.first_name ?? '';
+  field(profileForm, 'specialization').value = profile.specialization ?? '';
+  field(profileForm, 'fee').value = profile.fee ?? '';
+  field(profileForm, 'bio').value = profile.bio ?? '';
 
   showView('profile');
 }
 
-function renderSpecializationOptions() {
-  const select = profileForm.elements.specialization;
+function renderSpecializationOptions(): void {
+  const select = field(profileForm, 'specialization') as HTMLSelectElement;
   const current = select.value;
   select.replaceChildren(
     new Option('Не выбрана', ''),
@@ -88,20 +114,31 @@ function renderSpecializationOptions() {
 // ---------- Ошибки форм ----------
 
 // Ключи ошибок сервера (snake_case) переводим в имена полей формы.
-const SERVER_FIELD_MAP = { first_name: 'firstName' };
+const SERVER_FIELD_MAP: Record<string, string> = { first_name: 'firstName' };
 
-function clearErrors(form) {
-  form.querySelectorAll('[data-error-for]').forEach((el) => (el.textContent = ''));
-  form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
-  form.querySelector('[data-form-error]').textContent = '';
+function formErrorSlot(form: HTMLFormElement): HTMLElement {
+  const slot = form.querySelector<HTMLElement>('[data-form-error]');
+  if (!slot) throw new Error(`В форме #${form.id} нет блока для общей ошибки.`);
+  return slot;
 }
 
-function showErrors(form, fieldErrors, formError = '') {
-  let firstInvalid = null;
+function clearErrors(form: HTMLFormElement): void {
+  form.querySelectorAll('[data-error-for]').forEach((el) => (el.textContent = ''));
+  form.querySelectorAll('[aria-invalid]').forEach((el) => el.removeAttribute('aria-invalid'));
+  formErrorSlot(form).textContent = '';
+}
+
+function showErrors(
+  form: HTMLFormElement,
+  fieldErrors: Partial<Record<string, string>>,
+  formError = '',
+): void {
+  let firstInvalid: FieldElement | null = null;
   for (const [rawKey, message] of Object.entries(fieldErrors)) {
+    if (!message) continue;
     const key = SERVER_FIELD_MAP[rawKey] ?? rawKey;
-    const slot = form.querySelector(`[data-error-for="${key}"]`);
-    const input = form.elements[key];
+    const slot = form.querySelector(`[data-error-for="${CSS.escape(key)}"]`);
+    const input = findField(form, key);
     if (!slot || !input) {
       formError = [formError, message].filter(Boolean).join(' ');
       continue;
@@ -110,21 +147,21 @@ function showErrors(form, fieldErrors, formError = '') {
     input.setAttribute('aria-invalid', 'true');
     firstInvalid ??= input;
   }
-  form.querySelector('[data-form-error]').textContent = formError;
+  formErrorSlot(form).textContent = formError;
   firstInvalid?.focus();
 }
 
 // Блокирует кнопку на время запроса, чтобы не было повторной отправки.
-async function withPending(form, pendingText, action) {
-  const button = form.querySelector('button[type="submit"]');
-  if (button.disabled) return;
+async function withPending(form: HTMLFormElement, pendingText: string, action: () => Promise<void>): Promise<void> {
+  const button = form.querySelector<HTMLButtonElement>('button[type="submit"]');
+  if (!button || button.disabled) return;
   const idleText = button.textContent;
   button.disabled = true;
   button.textContent = pendingText;
   try {
     await action();
   } catch (err) {
-    showErrors(form, err.fieldErrors ?? {}, err.message);
+    showErrors(form, err instanceof ApiError ? err.fieldErrors : {}, err instanceof Error ? err.message : '');
   } finally {
     button.disabled = false;
     button.textContent = idleText;
@@ -133,7 +170,7 @@ async function withPending(form, pendingText, action) {
 
 // ---------- Вкладки ----------
 
-function selectTab(name, focus = false) {
+function selectTab(name: TabName, focus = false): void {
   for (const [key, tab] of Object.entries(tabs)) {
     const active = key === name;
     tab.setAttribute('aria-selected', String(active));
@@ -158,13 +195,13 @@ loginForm.addEventListener('submit', (event) => {
   clearErrors(loginForm);
   showBanner('');
   const values = {
-    username: loginForm.elements.username.value.trim(),
-    password: loginForm.elements.password.value,
+    username: field(loginForm, 'username').value.trim(),
+    password: field(loginForm, 'password').value,
   };
   const errors = validateLogin(values);
   if (Object.keys(errors).length) return showErrors(loginForm, errors);
 
-  return withPending(loginForm, 'Входим…', async () => {
+  void withPending(loginForm, 'Входим…', async () => {
     const user = await api.login(values.username, values.password);
     loginForm.reset();
     renderUser(user);
@@ -176,14 +213,14 @@ registerForm.addEventListener('submit', (event) => {
   clearErrors(registerForm);
   showBanner('');
   const values = {
-    username: registerForm.elements.username.value.trim(),
-    password: registerForm.elements.password.value,
-    passwordConfirm: registerForm.elements.passwordConfirm.value,
+    username: field(registerForm, 'username').value.trim(),
+    password: field(registerForm, 'password').value,
+    passwordConfirm: field(registerForm, 'passwordConfirm').value,
   };
   const errors = validateRegistration(values);
   if (Object.keys(errors).length) return showErrors(registerForm, errors);
 
-  return withPending(registerForm, 'Создаём аккаунт…', async () => {
+  void withPending(registerForm, 'Создаём аккаунт…', async () => {
     const user = await api.register(values.username, values.password);
     registerForm.reset();
     renderUser(user);
@@ -197,27 +234,27 @@ profileForm.addEventListener('submit', (event) => {
   showBanner('');
   const { errors, payload } = validateProfile(
     {
-      firstName: profileForm.elements.firstName.value,
-      specialization: profileForm.elements.specialization.value,
-      bio: profileForm.elements.bio.value,
-      fee: profileForm.elements.fee.value,
+      firstName: field(profileForm, 'firstName').value,
+      specialization: field(profileForm, 'specialization').value,
+      bio: field(profileForm, 'bio').value,
+      fee: field(profileForm, 'fee').value,
     },
     specializations,
   );
   if (Object.keys(errors).length) return showErrors(profileForm, errors);
 
-  return withPending(profileForm, 'Сохраняем…', async () => {
+  void withPending(profileForm, 'Сохраняем…', async () => {
     const user = await api.updateProfile(payload);
     renderUser(user);
     showBanner('Профиль сохранён.');
   });
 });
 
-$('#logout-btn').addEventListener('click', async (event) => {
-  const button = event.currentTarget;
-  button.disabled = true;
+const logoutButton = $<HTMLButtonElement>('#logout-btn');
+logoutButton.addEventListener('click', async () => {
+  logoutButton.disabled = true;
   await api.logout();
-  button.disabled = false;
+  logoutButton.disabled = false;
   showBanner('Вы вышли из аккаунта.');
   selectTab('login');
   showAuth();
@@ -225,7 +262,7 @@ $('#logout-btn').addEventListener('click', async (event) => {
 
 // ---------- Старт ----------
 
-async function loadSpecializations() {
+async function loadSpecializations(): Promise<void> {
   try {
     const list = await api.getSpecializations();
     if (list.length) specializations = list;
@@ -235,7 +272,7 @@ async function loadSpecializations() {
   renderSpecializationOptions();
 }
 
-async function start() {
+async function start(): Promise<void> {
   renderSpecializationOptions();
   const specializationsLoaded = loadSpecializations();
   try {
@@ -245,8 +282,8 @@ async function start() {
     else showAuth();
   } catch (err) {
     showAuth();
-    showBanner(err.message, true);
+    showBanner(err instanceof Error ? err.message : 'Не удалось загрузить страницу.', true);
   }
 }
 
-start();
+void start();

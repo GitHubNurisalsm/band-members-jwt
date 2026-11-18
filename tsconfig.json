@@ -1,0 +1,22 @@
+{
+  // Проверка типов для всего проекта (src + test). Ничего не выпускает.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "strict": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    // Node запускает .ts сам, просто вырезая типы, поэтому синтаксис только стираемый
+    // (без enum, namespace и parameter properties), а импорты — с расширением .ts.
+    "erasableSyntaxOnly": true,
+    "verbatimModuleSyntax": true,
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "skipLibCheck": true,
+    "noEmit": true
+  },
+  "include": ["src", "test"]
+}

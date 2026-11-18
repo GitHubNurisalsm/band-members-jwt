@@ -6,17 +6,18 @@ import {
   validateProfile,
   validateRegistration,
   validateUsername,
-} from '../validation.js';
+  type ProfileFormValues,
+} from '../src/validation.ts';
 
-const profile = (overrides = {}) => ({ firstName: '', specialization: '', bio: '', fee: '', ...overrides });
+const profile = (overrides: Partial<ProfileFormValues> = {}): ProfileFormValues => ({ firstName: '', specialization: '', bio: '', fee: '', ...overrides });
 
 test('username: допустимые символы как в Django, включая кириллицу', () => {
   assert.equal(validateUsername('brian.may+1@queen_-'), null);
   assert.equal(validateUsername('Фредди'), null);
-  assert.match(validateUsername('john deacon'), /Только/);
-  assert.match(validateUsername('   '), /Введите/);
+  assert.match(validateUsername('john deacon') ?? '', /Только/);
+  assert.match(validateUsername('   ') ?? '', /Введите/);
   assert.equal(validateUsername('a'.repeat(150)), null);
-  assert.match(validateUsername('a'.repeat(151)), /150/);
+  assert.match(validateUsername('a'.repeat(151)) ?? '', /150/);
 });
 
 test('регистрация: пароль минимум 6 символов и совпадение подтверждения', () => {
@@ -40,7 +41,7 @@ test('профиль: пустая ставка не отправляется, �
 });
 
 test('профиль: ставка decimal(10,2), запятая заменяется точкой', () => {
-  const ok = (fee) => validateProfile(profile({ fee }), FALLBACK_SPECIALIZATIONS);
+  const ok = (fee: string) => validateProfile(profile({ fee }), FALLBACK_SPECIALIZATIONS);
   assert.equal(ok('1500').payload.fee, '1500');
   assert.equal(ok('1500,5').payload.fee, '1500.5');
   assert.equal(ok('99999999.99').payload.fee, '99999999.99');
