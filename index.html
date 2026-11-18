@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Состав — участники группы</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600&display=swap">
+  <link rel="stylesheet" href="style.css">
+  <script type="module" src="main.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="container topbar-inner">
+      <span class="brand"><span class="brand-mark" aria-hidden="true">●</span> Состав</span>
+      <div class="session" id="session" hidden>
+        <span class="session-user" id="session-user"></span>
+        <button class="btn btn-ghost btn-sm" type="button" id="logout-btn">Выйти</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <p class="banner" id="banner" role="status" aria-live="polite" hidden></p>
+
+    <section id="view-loading" class="view view-center">
+      <p class="muted">Проверяем сессию…</p>
+    </section>
+
+    <section id="view-auth" class="view auth" hidden aria-labelledby="auth-title">
+      <div class="auth-intro">
+        <p class="eyebrow">Регистрация участников</p>
+        <h1 id="auth-title">Встань в состав группы</h1>
+        <p class="lede">Создайте аккаунт, укажите инструмент и ставку. Остальные участники увидят, кто за что отвечает на сцене.</p>
+      </div>
+
+      <div class="card auth-card">
+        <div class="tabs" role="tablist" aria-label="Вход или регистрация">
+          <button class="tab" type="button" role="tab" id="tab-login" aria-controls="login-form" aria-selected="true">Вход</button>
+          <button class="tab" type="button" role="tab" id="tab-register" aria-controls="register-form" aria-selected="false" tabindex="-1">Регистрация</button>
+        </div>
+
+        <form id="login-form" class="form" role="tabpanel" aria-labelledby="tab-login" novalidate>
+          <div class="field">
+            <label for="login-username">Имя пользователя</label>
+            <input id="login-username" name="username" autocomplete="username" required>
+            <p class="field-error" data-error-for="username"></p>
+          </div>
+          <div class="field">
+            <label for="login-password">Пароль</label>
+            <input id="login-password" name="password" type="password" autocomplete="current-password" required>
+            <p class="field-error" data-error-for="password"></p>
+          </div>
+          <p class="form-error" data-form-error role="alert"></p>
+          <button class="btn btn-block" type="submit">Войти</button>
+        </form>
+
+        <form id="register-form" class="form" role="tabpanel" aria-labelledby="tab-register" novalidate hidden>
+          <div class="field">
+            <label for="reg-username">Имя пользователя</label>
+            <input id="reg-username" name="username" autocomplete="username" maxlength="150" required>
+            <p class="hint">Буквы, цифры и символы @ . + - _</p>
+            <p class="field-error" data-error-for="username"></p>
+          </div>
+          <div class="field">
+            <label for="reg-password">Пароль</label>
+            <input id="reg-password" name="password" type="password" autocomplete="new-password" minlength="6" required>
+            <p class="hint">Минимум 6 символов</p>
+            <p class="field-error" data-error-for="password"></p>
+          </div>
+          <div class="field">
+            <label for="reg-password-confirm">Повторите пароль</label>
+            <input id="reg-password-confirm" name="passwordConfirm" type="password" autocomplete="new-password" required>
+            <p class="field-error" data-error-for="passwordConfirm"></p>
+          </div>
+          <p class="form-error" data-form-error role="alert"></p>
+          <button class="btn btn-block" type="submit">Зарегистрироваться</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-profile" class="view profile" hidden aria-labelledby="profile-title">
+      <article class="card member-card" aria-label="Карточка участника">
+        <div class="avatar" id="member-avatar" aria-hidden="true">?</div>
+        <h1 class="member-name" id="profile-title"></h1>
+        <p class="member-username" id="member-username"></p>
+        <dl class="member-facts">
+          <div><dt>Инструмент</dt><dd id="member-specialization"></dd></div>
+          <div><dt>Ставка</dt><dd id="member-fee"></dd></div>
+        </dl>
+        <p class="member-bio" id="member-bio"></p>
+      </article>
+
+      <div class="card">
+        <h2 class="card-title">Редактировать профиль</h2>
+        <form id="profile-form" class="form" novalidate>
+          <div class="field">
+            <label for="pf-first-name">Имя</label>
+            <input id="pf-first-name" name="firstName" maxlength="100" autocomplete="given-name">
+            <p class="field-error" data-error-for="firstName"></p>
+          </div>
+          <div class="field">
+            <label for="pf-specialization">Специализация</label>
+            <select id="pf-specialization" name="specialization"></select>
+            <p class="field-error" data-error-for="specialization"></p>
+          </div>
+          <div class="field">
+            <label for="pf-fee">Ставка за концерт</label>
+            <input id="pf-fee" name="fee" inputmode="decimal" placeholder="Например, 1500.00">
+            <p class="field-error" data-error-for="fee"></p>
+          </div>
+          <div class="field">
+            <label for="pf-bio">О себе</label>
+            <textarea id="pf-bio" name="bio" rows="4" placeholder="Опыт, любимые группы, с кем играли"></textarea>
+            <p class="field-error" data-error-for="bio"></p>
+          </div>
+          <p class="form-error" data-form-error role="alert"></p>
+          <button class="btn" type="submit">Сохранить</button>
+        </form>
+      </div>
+    </section>
+  </main>
+</body>
+</html>
